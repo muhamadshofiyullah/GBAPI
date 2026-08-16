@@ -1,0 +1,107 @@
+name: Telegram Release Notification
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  notify-telegram:
+    name: Send Telegram Release Notification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Notification to Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: '8226616269:AAEwTA1F7g5WUy0j7HVzdCpyNLwB56KAwSI'
+          TELEGRAM_CHAT_ID: '-1001165396516'
+          TELEGRAM_THREAD_ID: ''
+          REPO_NAME: ${{ github.repository }}
+          TAG_NAME: ${{ github.event.release.tag_name || 'v1.0.0-test' }}
+          RELEASE_TITLE: ${{ github.event.release.name || 'Test Release Notification' }}
+          RELEASE_URL: ${{ github.event.release.html_url || format('{0}/{1}/releases', github.server_url, github.repository) }}
+          RELEASE_BODY: ${{ github.event.release.body || 'No release notes provided.' }}
+          RELEASE_AUTHOR: ''
+          IS_PRERELEASE: ${{ github.event.release.prerelease || false }}
+          INCLUDE_ASSETS: true
+        run: |
+          python3 - << 'EOF'
+          import os
+          import urllib.request
+          import json
+          import html
+
+          bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '').strip()
+          chat_id = os.environ.get('TELEGRAM_CHAT_ID', '').strip()
+          thread_id = os.environ.get('TELEGRAM_THREAD_ID', '').strip()
+          repo = os.environ.get('REPO_NAME', 'Repository')
+          tag = os.environ.get('TAG_NAME', '')
+          title = os.environ.get('RELEASE_TITLE', '') or tag
+          url = os.environ.get('RELEASE_URL', '')
+          body = os.environ.get('RELEASE_BODY', '').strip()
+          author = os.environ.get('RELEASE_AUTHOR', '').strip()
+          is_prerelease = os.environ.get('IS_PRERELEASE', 'false').lower() == 'true'
+          include_assets = os.environ.get('INCLUDE_ASSETS', 'true').lower() == 'true'
+
+          if not bot_token or not chat_id:
+              print('::error::TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing.')
+              exit(1)
+
+          badge = '🧪 <b>[PRE-RELEASE]</b> ' if is_prerelease else '🚀 <b>[NEW RELEASE]</b> '
+          safe_repo = html.escape(repo)
+          safe_tag = html.escape(tag)
+          safe_title = html.escape(title)
+          safe_author = html.escape(author)
+
+          if len(body) > 1500:
+              body = body[:1500] + '\n...(truncated)'
+          safe_body = html.escape(body)
+
+          msg_parts = [
+              f'{badge}<b><a href="{url}">{safe_repo}</a></b>',
+              '',
+              f'📦 <b>Release:</b> {safe_title}',
+              f'🏷️ <b>Tag:</b> <code>{safe_tag}</code>',
+          ]
+
+          if safe_author:
+              msg_parts.append(f'👤 <b>Author:</b> @{safe_author}')
+
+          if safe_body:
+              msg_parts.extend(['', '📝 <b>Release Notes:</b>', f'<blockquote>{safe_body}</blockquote>'])
+
+          links = [f'<a href="{url}">🔗 View Release</a>']
+          if include_assets and tag:
+              zip_url = f'https://github.com/{repo}/archive/refs/tags/{tag}.zip'
+              links.append(f'<a href="{zip_url}">📥 Download .zip</a>')
+
+          msg_parts.extend(['', ' | '.join(links)])
+          full_message = '\n'.join(msg_parts)
+
+          payload = {
+              'chat_id': chat_id,
+              'text': full_message,
+              'parse_mode': 'HTML',
+              'disable_web_page_preview': False
+          }
+          if thread_id and thread_id.isdigit():
+              payload['message_thread_id'] = int(thread_id)
+
+          api_url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
+          req = urllib.request.Request(
+              api_url,
+              data=json.dumps(payload).encode('utf-8'),
+              headers={'Content-Type': 'application/json'}
+          )
+
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  res = json.loads(resp.read().decode())
+                  if res.get('ok'):
+                      print('::notice::Telegram release notification sent successfully!')
+                  else:
+                      print(f'::error::Telegram API error: {res}')
+                      exit(1)
+          except Exception as e:
+              print(f'::error::Failed to send Telegram notification: {e}')
+              exit(1)
+          EOF

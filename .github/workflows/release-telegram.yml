@@ -23,6 +23,17 @@ jobs:
           RELEASE_AUTHOR: ${{ github.event.release.author.login || github.actor }}
           IS_PRERELEASE: ${{ github.event.release.prerelease || false }}
           INCLUDE_ASSETS: true
+          CUSTOM_TEMPLATE: |
+            {badge}<b><a href="{url}">{repo}</a></b>
+            
+            📦 <b>Release:</b> {title}
+            🏷️ <b>Tag:</b> <code>{version}</code>
+            👤 <b>Author:</b> @{author}
+            
+            📝 <b>Release Notes:</b>
+            <blockquote>{notes}</blockquote>
+            
+            🔗 <a href="{url}">View Release</a> | 📥 <a href="https://github.com/{repo}/releases/download/{tag}/griyabayar.zip">Download .zip</a>
         run: |
           python3 - << 'EOF'
           import os
@@ -33,6 +44,7 @@ jobs:
           bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '').strip()
           chat_id = os.environ.get('TELEGRAM_CHAT_ID', '').strip()
           thread_id = os.environ.get('TELEGRAM_THREAD_ID', '').strip()
+          custom_template = os.environ.get('CUSTOM_TEMPLATE', '').strip()
           repo = os.environ.get('REPO_NAME', 'Repository')
           tag = os.environ.get('TAG_NAME', '')
           title = os.environ.get('RELEASE_TITLE', '') or tag
@@ -55,27 +67,39 @@ jobs:
           if len(body) > 1500:
               body = body[:1500] + '\n...(truncated)'
           safe_body = html.escape(body)
+          zip_url = f'https://github.com/{repo}/archive/refs/tags/{tag}.zip' if tag else url
 
-          msg_parts = [
-              f'{badge}<b><a href="{url}">{safe_repo}</a></b>',
-              '',
-              f'📦 <b>Release:</b> {safe_title}',
-              f'🏷️ <b>Tag:</b> <code>{safe_tag}</code>',
-          ]
+          if custom_template:
+              full_message = custom_template.replace('{repo}', safe_repo) \
+                                            .replace('{version}', safe_tag) \
+                                            .replace('{tag}', safe_tag) \
+                                            .replace('{title}', safe_title) \
+                                            .replace('{author}', safe_author) \
+                                            .replace('{notes}', safe_body) \
+                                            .replace('{body}', safe_body) \
+                                            .replace('{url}', url) \
+                                            .replace('{badge}', badge) \
+                                            .replace('{download_zip}', zip_url)
+          else:
+              msg_parts = [
+                  f'{badge}<b><a href="{url}">{safe_repo}</a></b>',
+                  '',
+                  f'📦 <b>Release:</b> {safe_title}',
+                  f'🏷️ <b>Tag:</b> <code>{safe_tag}</code>',
+              ]
 
-          if safe_author:
-              msg_parts.append(f'👤 <b>Author:</b> @{safe_author}')
+              if safe_author:
+                  msg_parts.append(f'👤 <b>Author:</b> @{safe_author}')
 
-          if safe_body:
-              msg_parts.extend(['', '📝 <b>Release Notes:</b>', f'<blockquote>{safe_body}</blockquote>'])
+              if safe_body:
+                  msg_parts.extend(['', '📝 <b>Release Notes:</b>', f'<blockquote>{safe_body}</blockquote>'])
 
-          links = [f'<a href="{url}">🔗 View Release</a>']
-          if include_assets and tag:
-              zip_url = f'https://github.com/{repo}/archive/refs/tags/{tag}.zip'
-              links.append(f'<a href="{zip_url}">📥 Download .zip</a>')
+              links = [f'<a href="{url}">🔗 View Release</a>']
+              if include_assets and tag:
+                  links.append(f'<a href="{zip_url}">📥 Download .zip</a>')
 
-          msg_parts.extend(['', ' | '.join(links)])
-          full_message = '\n'.join(msg_parts)
+              msg_parts.extend(['', ' | '.join(links)])
+              full_message = '\n'.join(msg_parts)
 
           payload = {
               'chat_id': chat_id,

@@ -12,15 +12,15 @@ jobs:
     steps:
       - name: Send Notification to Telegram
         env:
-          TELEGRAM_BOT_TOKEN: '8226616269:AAEwTA1F7g5WUy0j7HVzdCpyNLwB56KAwSI'
-          TELEGRAM_CHAT_ID: '-1001165396516'
-          TELEGRAM_THREAD_ID: ''
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_THREAD_ID: ${{ secrets.TELEGRAM_THREAD_ID }}
           REPO_NAME: ${{ github.repository }}
           TAG_NAME: ${{ github.event.release.tag_name || 'v1.0.0-test' }}
           RELEASE_TITLE: ${{ github.event.release.name || 'Test Release Notification' }}
           RELEASE_URL: ${{ github.event.release.html_url || format('{0}/{1}/releases', github.server_url, github.repository) }}
           RELEASE_BODY: ${{ github.event.release.body || 'No release notes provided.' }}
-          RELEASE_AUTHOR: ''
+          RELEASE_AUTHOR: ${{ github.event.release.author.login || github.actor }}
           IS_PRERELEASE: ${{ github.event.release.prerelease || false }}
           INCLUDE_ASSETS: true
         run: |

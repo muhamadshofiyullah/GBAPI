@@ -35,7 +35,7 @@ jobs:
             📝 <b>Release Notes:</b>
             <blockquote>{notes}</blockquote>
             
-            🔗 <a href="{url}">View Release</a> | 📥 <a href="https://github.com/{repo}/releases/download/{tag}/griyabayar.zip">Download .zip</a>
+            🔗 <a href="{url}">View Release</a> | 📥 <a href="{download_zip}">Download {asset_name}</a>
         run: |
           python3 - << 'EOF'
           import os
